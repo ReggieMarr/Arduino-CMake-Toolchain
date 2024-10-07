@@ -20,7 +20,7 @@ My initial expectation was to contribute to Arduino-CMake-NG to fix the above li
     - [x] Remote provisioning through network
     - [x] Upload using programmer
     - [x] Burn bootloader
-- [x] Support linking with Arduino libraries (see `target_link_arduino_libraries`)
+- [x] Support linking with Arduino lijjjjjjjjjjjjjjjjjbraries (see `target_link_arduino_libraries`)
     - [x] Arduino *native* libraries (e.g. Ethernet, Wire)
     - [x] User installed 3rd Party Arduino libraries (e.g. IRremote)
     - [x] Project specific Arduino libraries (those present in `<CMAKE_SOURCE_DIR>/libraries`)
@@ -140,6 +140,59 @@ For local package management, the CMake option `ARDUINO_BOARD_MANAGER_URL` can b
 
 ```sh
 cmake -D CMAKE_TOOLCHAIN_FILE=/path/to/Arduino-toolchain.cmake -D ARDUINO_BOARD_MANAGER_URL=https://dl.espressif.com/dl/package_esp32_index.json -D ARDUINO_BOARD_OPTIONS_FILE=/path/to/MyESP32BoardOptions.cmake <CMAKE_SOURCE_DIR>
+```
+## Port Validation and Auto-Resetting Feature
+
+### Background
+
+During the development process, we encountered an issue where the upload process for the Arduino Due would occasionally fail. Upon investigation, we discovered two main causes:
+
+1. Incorrect port naming conventions in some environments.
+2. The Arduino Due's requirement to be reset before firmware upload.
+
+### Port Validation
+
+The port validation feature addresses the issue of inconsistent port naming across different systems. Some environments include the `/dev/` prefix in the port name, while others don't. This inconsistency can lead to upload failures.
+
+Our solution automatically detects and removes the `/dev/` prefix if present, ensuring a consistent port name format for the upload tool.
+
+### Auto-Resetting
+
+The Arduino Due, unlike some other Arduino boards, requires a specific reset sequence before it can accept new firmware. This reset is typically done manually by double-pressing the reset button on the board.
+
+Our auto-resetting feature automates this process by:
+
+1. Setting the baud rate to 1200 bps, which triggers the board's bootloader.
+2. Waiting for the device to disappear and reappear on the system.
+3. Providing a short delay to ensure the board is ready for upload.
+
+### Justification
+
+Implementing these features offers several benefits:
+
+1. **Improved Reliability**: By ensuring correct port naming and proper board reset, we significantly reduce the chances of upload failures.
+
+2. **Enhanced User Experience**: Users no longer need to manually reset the board or worry about correct port name formatting.
+
+3. **Consistency Across Environments**: These features help maintain a consistent upload process across different development environments and operating systems.
+
+4. **Time-Saving**: Automated reset and port validation save time and reduce frustration during the development and deployment process.
+
+5. **Error Reduction**: By automating these steps, we minimize the potential for human error in the upload process.
+
+### Configuration
+
+Both features are enabled by default but can be disabled if needed:
+
+- `ARDUINO_VALIDATE_PORT`: Controls the port name validation (default: ON)
+- `ARDUINO_RESET_BOARD`: Controls the auto-reset feature (default: ON)
+
+To disable either feature, set the corresponding option to OFF in your CMake configuration:
+
+```cmake
+set(ARDUINO_VALIDATE_PORT OFF)
+set(ARDUINO_RESET_BOARD OFF)
+
 ```
 
 ## How it works

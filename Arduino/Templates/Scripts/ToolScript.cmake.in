@@ -25,6 +25,33 @@ set(all_options "")
 set(_script "${CMAKE_CURRENT_LIST_FILE}")
 get_filename_component(_action_str "${_script}" NAME_WE)
 
+# arduino-cli resets ports prior to upload with the arduino due it was found
+# that the arduino due would fail to allow uploads unless it was reset like this
+# (which boots the device into the bootloader)
+function(reset_arduino_board port_name)
+    execute_process(
+        COMMAND stty -F /dev/${port_name} 1200
+        COMMAND ${CMAKE_COMMAND} -E sleep 0.5
+    )
+    execute_process(
+        COMMAND bash -c "while [ ! -c /dev/${port_name} ]; do sleep 0.1; done"
+    )
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E sleep 0.5
+    )
+    message(STATUS "Arduino board reset completed.")
+endfunction()
+
+# The bossac toolchain assumes that the port name is given without the /dev prefix.
+# This provides more Cross-Platform compatibility so we check for it
+function(validate_and_fix_port_name port_name)
+    if(${port_name} MATCHES "^/dev/")
+        string(REGEX REPLACE "^/dev/" "" fixed_port "${${port_name}}")
+        message(WARNING "Port name should not include '/dev/'. Changed from '${${port_name}}' to '${fixed_port}'.")
+        set(${port_name} "${fixed_port}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Format the string for displaying help for usage
 macro(_append_usage_for_option option default_var)
 
@@ -358,15 +385,39 @@ elseif (NOT missing_options STREQUAL "")
 	execute_process(COMMAND ${CMAKE_COMMAND} -E echo "${_usage}")
 	message(FATAL_ERROR "*** ${_action_str} failed!")
 else()
-	# execute the tool
-	separate_arguments(_pattern UNIX_COMMAND "${tool_cmdline}")
-	if (CMAKE_VERBOSE_MAKEFILE OR DEFINED ENV{VERBOSE})
-		execute_process(COMMAND ${CMAKE_COMMAND} -E echo "${tool_cmdline}")
-	endif()
-	
-	execute_process(COMMAND ${_pattern} RESULT_VARIABLE result)
-	if (NOT "${result}" EQUAL 0)
-		message(FATAL_ERROR "*** ${_action_str} failed!")
-	endif()
-endif()
+    # execute the tool
+    separate_arguments(_pattern UNIX_COMMAND "${tool_cmdline}")
 
+    # Extract the port name from the command line
+    string(REGEX MATCH "--port=([^ ]+)" _port_match "${tool_cmdline}")
+    if(_port_match)
+        set(_port_name "${CMAKE_MATCH_1}")
+
+        # REVIEW we may want to put this behind some conditional logic
+        # if(ARDUINO_VALIDATE_PORT)
+            # Validate and fix port name
+            validate_and_fix_port_name(_port_name)
+
+            # Update the tool_cmdline with the potentially fixed port name
+            string(REPLACE "--port=${CMAKE_MATCH_1}" "--port=${_port_name}" tool_cmdline "${tool_cmdline}")
+            separate_arguments(_pattern UNIX_COMMAND "${tool_cmdline}")
+        # endif()
+
+        # REVIEW we may want to put this behind some conditional logic
+		# if(ARDUINO_RESET_BOARD)
+            # Reset the Arduino board
+            reset_arduino_board("${_port_name}")
+        # endif()
+    else()
+        message(WARNING "Could not find port name in the command. Skipping validation and reset.")
+    endif()
+
+    if (CMAKE_VERBOSE_MAKEFILE OR DEFINED ENV{VERBOSE})
+        execute_process(COMMAND ${CMAKE_COMMAND} -E echo "${tool_cmdline}")
+    endif()
+
+    execute_process(COMMAND ${_pattern} RESULT_VARIABLE result)
+    if (NOT "${result}" EQUAL 0)
+        message(FATAL_ERROR "*** ${_action_str} failed!")
+    endif()
+endif()

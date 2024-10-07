@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.0.0)
+# set(CMAKE_TOOLCHAIN_FILE /custom_libs/Arduino-CMake-Toolchain/Arduino-toolchain.cmake)
+# set(ARDUINO_ENABLE_PACKAGE_MANAGER TRUE)
+# set(ARDUINO_INSTALL_PATH "/home/user/.arduino15")
+# set(ARDUINO_PACKAGE_PATH "${ARDUINO_INSTALL_PATH}/packages")
 
 project(Examples C CXX)
 
