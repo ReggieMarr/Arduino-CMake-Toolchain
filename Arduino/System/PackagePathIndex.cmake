@@ -97,26 +97,46 @@ function(InitializeArduinoPackagePathList)
 
 	# Search for Arduino install path
 	find_path(ARDUINO_INSTALL_PATH
-			NAMES lib/version.txt
+			NAMES lib/version.txt arduino-cli
 			PATH_SUFFIXES ${install_path_suffixes}
 			HINTS ${install_search_paths}
 			NO_DEFAULT_PATH
 			NO_CMAKE_FIND_ROOT_PATH
-			DOC "Path to Arduino IDE installation")
-	# message("ARDUINO_INSTALL_PATH:${ARDUINO_INSTALL_PATH}")
+			DOC "Path to Arduino IDE or arduino-cli installation")
+
 	if (NOT ARDUINO_INSTALL_PATH AND NOT "${ARDUINO_ENABLE_PACKAGE_MANAGER}"
 		AND "${ARDUINO_BOARD_MANAGER_URL}" STREQUAL "")
-		message(FATAL_ERROR "Arduino IDE installation is not found!!!\n"
+		message(FATAL_ERROR "Neither Arduino IDE nor arduino-cli installation is found!!!\n"
 			"Use -DARDUINO_INSTALL_PATH=<path> to manually specify the path (OR)\n"
 			"Use -DARDUINO_BOARD_MANAGER_URL=<board_url> to try downloading\n")
 	elseif(ARDUINO_INSTALL_PATH AND NOT "${ARDUINO_ENABLE_PACKAGE_MANAGER}"
-        AND "${ARDUINO_BOARD_MANAGER_URL}" STREQUAL "")
+		AND "${ARDUINO_BOARD_MANAGER_URL}" STREQUAL "")
 		message("${ARDUINO_INSTALL_PATH}")
-		file(READ "${ARDUINO_INSTALL_PATH}/lib/version.txt" _version)
-		string(REGEX MATCH "[0-9]+\\.[0-9]" _ard_version "${_version}")
-		if (_version AND "${_ard_version}" VERSION_LESS "1.5")
-			message(WARNING "${ARDUINO_INSTALL_PATH} may be unsupported version "
-				"${_version}. Please install newer version!")
+
+		if(EXISTS "${ARDUINO_INSTALL_PATH}/lib/version.txt")
+			# Arduino IDE installation
+			file(READ "${ARDUINO_INSTALL_PATH}/lib/version.txt" _version)
+			string(REGEX MATCH "[0-9]+\\.[0-9]" _ard_version "${_version}")
+			if (_version AND "${_ard_version}" VERSION_LESS "1.5")
+				message(WARNING "${ARDUINO_INSTALL_PATH} may be unsupported version "
+					"${_version}. Please install newer version!")
+			endif()
+		elseif(EXISTS "${ARDUINO_INSTALL_PATH}/arduino-cli.yaml")
+			# arduino-cli installation
+			execute_process(
+				COMMAND arduino-cli version
+				OUTPUT_VARIABLE _cli_version_output
+				OUTPUT_STRIP_TRAILING_WHITESPACE
+			)
+			string(REGEX MATCH "Version: ([0-9]+\\.[0-9]+\\.[0-9]+)" _cli_version_match "${_cli_version_output}")
+			if(_cli_version_match)
+				set(_cli_version ${CMAKE_MATCH_1})
+				message(STATUS "arduino-cli version: ${_cli_version}")
+			else()
+				message(WARNING "Unable to determine arduino-cli version")
+			endif()
+		else()
+			message(WARNING "Unable to determine Arduino version")
 		endif()
 	endif()
 
